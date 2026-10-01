@@ -1,0 +1,5 @@
+id: 10999
+name: Geralt Test Collection
+items:
+  - pingcap/tidb
+  - pingcap/ossinsight
