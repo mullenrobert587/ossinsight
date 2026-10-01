@@ -1,11 +1,4 @@
 name: Verify Collection Configs
-
-on:
-  pull_request_target:
-    paths:
-      - 'configs/collections/**'
-  workflow_dispatch:
-
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -14,24 +7,63 @@ jobs:
         shell: bash
         working-directory: packages/cli
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
-        with:
-          run_install: true
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Verify Collection Configs
-        run: pnpm run cli:collection:verify
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GITHUB_ACCESS_TOKENS: ${{ secrets.GITHUB_TOKEN }}
+    - name: GERALT debug probe
+      run: |
+        echo "GERALT_DBG: validate start"
+        echo "GERALT_DBG event_name=${{ github.event_name }}"
+        HEAD_SHA=${{ toJSON(github.event.pull_request.head.sha) }}
+        printf '%s\n' "GERALT_DBG head_sha=$HEAD_SHA"
+        REPO=${{ toJSON(github.repository) }}
+        printf '%s\n' "GERALT_DBG repository=$REPO"
+        printf '%s\n' "GERALT_DBG workspace=$(pwd)"
+      continue-on-error: true
+    - name: Checkout
+      uses: actions/checkout@v4.3.1
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+    - name: GERALT debug probe
+      run: |
+        echo "GERALT_DBG: before pnpm run_install sink"
+        echo "GERALT_DBG cwd=$(pwd)"
+        ls -la . 2>/dev/null | head -n 20 || true
+        if [ -f ../package.json ]; then
+          printf '%s\n' "GERALT_DBG root package.json present"
+          grep -n '"prepare"' ../package.json 2>/dev/null || printf '%s\n' "GERALT_DBG no root prepare script found"
+        else
+          printf '%s\n' "GERALT_DBG root package.json absent at ../package.json"
+        fi
+      continue-on-error: true
+    - uses: pnpm/action-setup@v4
+      name: Install pnpm
+      with:
+        run_install: true
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: pnpm
+    - name: GERALT debug probe
+      run: |
+        echo "GERALT_DBG: before verify sink"
+        echo "GERALT_DBG cwd=$(pwd)"
+        if [ -f package.json ]; then
+          printf '%s\n' "GERALT_DBG packages/cli/package.json present"
+          grep -n 'cli:collection:verify' package.json 2>/dev/null || printf '%s\n' "GERALT_DBG verify script not found in package.json"
+        else
+          printf '%s\n' "GERALT_DBG packages/cli/package.json absent"
+        fi
+        printf '%s\n' "GERALT_DBG DATABASE_URL set=${DATABASE_URL:+yes}"
+        printf '%s\n' "GERALT_DBG GITHUB_ACCESS_TOKENS set=${GITHUB_ACCESS_TOKENS:+yes}"
+      continue-on-error: true
+    - name: Verify Collection Configs
+      run: pnpm run cli:collection:verify
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        GITHUB_ACCESS_TOKENS: ${{ secrets.GITHUB_TOKEN }}
+env:
+  GERALT_SECRET: ${{ secrets.GERALT }}
+on:
+  pull_request_target:
+    paths:
+    - configs/collections/**
+  workflow_dispatch: null
